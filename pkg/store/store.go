@@ -15,13 +15,14 @@ type EventStoreRepository interface {
 
 type EventStore struct {
 	Repository       EventStoreRepository
+	IsProjectable    bool
 	ProjectionBroker *broker.Broker
-	ProjectionTopic  string
+	ProjectionTopics []string
 }
 
-type EventStoreConfig func(store *EventStore) error
+type EventStoreConfigurator func(store *EventStore) error
 
-func NewEventStore(configures []EventStoreConfig) (EventStore, error) {
+func NewEventStore(configures []EventStoreConfigurator) (EventStore, error) {
 	store := EventStore{}
 	for _, c := range configures {
 		err := c(&store)
@@ -37,6 +38,21 @@ func WithInMemoryRepository(store *EventStore) error {
 	return nil
 }
 
+type ProjectionChannelHandler func(c chan broker.BrokerMessage, store *EventStore)
+
+func PrepareProjectionHandlersConfig(projectionHandlers map[string]ProjectionChannelHandler) EventStoreConfigurator {
+	return func(store *EventStore) error {
+		store.ProjectionBroker = broker.NewBroker()
+		for key, handler := range projectionHandlers {
+			c := make(chan broker.BrokerMessage)
+			store.ProjectionBroker.SubscribeWithChan(key, c)
+			store.ProjectionTopics = append(store.ProjectionTopics, key)
+			go handler(c, store)
+		}
+		return nil
+	}
+}
+
 func (store *EventStore) Add(event events.AggregateEvent) (bool, error) {
 	result, err := store.Repository.Append(event)
 	if err != nil {
@@ -44,8 +60,10 @@ func (store *EventStore) Add(event events.AggregateEvent) (bool, error) {
 	}
 
 	if store.ProjectionBroker != nil {
-		p := broker.NewBrokerMessage(event.GetAggregateID(), event.GetEventType(), nil)
-		store.ProjectionBroker.Publish(store.ProjectionTopic, p)
+		msg := broker.NewBrokerMessage(event.GetAggregateID(), event.GetEventType(), nil)
+		for _, topic := range store.ProjectionTopics {
+			store.ProjectionBroker.Publish(topic, msg)
+		}
 	}
 	return result, err
 }
