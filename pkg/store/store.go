@@ -40,7 +40,7 @@ func WithInMemoryRepository(store *EventStore) error {
 
 type ProjectionChannelHandler func(c chan broker.BrokerMessage, store *EventStore)
 
-func PrepareProjectionHandlersConfig(projectionHandlers map[string]ProjectionChannelHandler) EventStoreConfigurator {
+func NewProjectionHandlersConfig(projectionHandlers map[string]ProjectionChannelHandler) EventStoreConfigurator {
 	return func(store *EventStore) error {
 		store.ProjectionBroker = broker.NewBroker()
 		for key, handler := range projectionHandlers {
