@@ -1,9 +1,9 @@
 package store_test
 
 import (
-	"errors"
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/pix303/eventstore-go-v2/pkg/events"
@@ -25,13 +25,13 @@ func TestStore_ok(t *testing.T) {
 	store, err := store.NewEventStore([]store.EventStoreConfigurator{store.WithInMemoryRepository})
 	exitWithError(err)
 	payload := FakePayload{"hello"}
-	evt := events.NewStoreEvent("some-event", "something", "misterX", payload)
+	evt, _ := events.NewStoreEvent("some-event", "something", "misterX", payload, nil)
 
 	_, err = store.Add(evt)
 	exitWithError(err)
 
 	if evt.EventType != "some-event" {
-		exitWithError(errors.New(fmt.Sprintf("expect some-event, got %s", evt.EventType)))
+		exitWithError(fmt.Errorf("expect some-event, got %s", evt.EventType))
 	}
 
 	_, err = store.Add(evt)
@@ -42,26 +42,26 @@ func TestStore_ok(t *testing.T) {
 	exitWithError(err)
 
 	if len(result) != 3 {
-		exitWithError(errors.New(fmt.Sprintf("expect 3 length, got %d", len(result))))
+		exitWithError(fmt.Errorf("expect 3 length, got %d", len(result)))
 	}
 
 	result, err = store.GetByID(evt.AggregateID)
 	exitWithError(err)
 	if len(result) != 3 {
-		exitWithError(errors.New(fmt.Sprintf("expect 3 length, got %d", len(result))))
+		exitWithError(fmt.Errorf("expect 3 length, got %d", len(result)))
 	}
 
-	resultByID, ok, err := store.GetByEventID(evt.ID)
+	resultByID, ok, err := store.GetByEventID(strconv.Itoa(int(evt.Id)))
 	exitWithError(err)
 
 	if ok != true {
-		exitWithError(errors.New(fmt.Sprintf("expect to be found , got %v", ok)))
+		exitWithError(fmt.Errorf("expect to be found , got %v", ok))
 	}
 
 	finalResultByID := *resultByID
 
-	if finalResultByID.GetAggregateName() != "something" {
-		t.Errorf("event aggregate name must be something istead of %s", finalResultByID.GetAggregateName())
-		exitWithError(errors.New(fmt.Sprintf("expect to be something, got %v", finalResultByID.GetAggregateName())))
+	if finalResultByID.AggregateID != "something" {
+		t.Errorf("event aggregate name must be something istead of %s", finalResultByID.AggregateID)
+		exitWithError(fmt.Errorf("expect to be something, got %v", finalResultByID.AggregateName))
 	}
 }

@@ -2,15 +2,16 @@ package store
 
 import (
 	"github.com/pix303/eventstore-go-v2/internal/repository"
+	"github.com/pix303/eventstore-go-v2/internal/repository/postgres"
 	"github.com/pix303/eventstore-go-v2/pkg/broker"
 	"github.com/pix303/eventstore-go-v2/pkg/events"
 )
 
 type EventStoreRepository interface {
-	Append(event events.AggregateEvent) (bool, error)
-	RetriveByID(id string) (*events.AggregateEvent, bool, error)
-	RetriveByAggregateID(id string) ([]events.AggregateEvent, bool, error)
-	RetriveByAggregateName(name string) ([]events.AggregateEvent, bool, error)
+	Append(event events.StoreEvent) (bool, error)
+	RetriveByID(id string) (*events.StoreEvent, bool, error)
+	RetriveByAggregateID(id string) ([]events.StoreEvent, bool, error)
+	RetriveByAggregateName(name string) ([]events.StoreEvent, bool, error)
 }
 
 type EventStore struct {
@@ -38,6 +39,17 @@ func WithInMemoryRepository(store *EventStore) error {
 	return nil
 }
 
+func NewPostgresqlRepository() EventStoreConfigurator {
+	return func(store *EventStore) error {
+		pr, err := postres.NewPostgresqlRepository()
+		if err != nil {
+			return err
+		}
+		store.Repository = pr
+		return nil
+	}
+}
+
 type ProjectionChannelHandler func(c chan broker.BrokerMessage, store *EventStore)
 
 func NewProjectionHandlersConfig(projectionHandlers map[string]ProjectionChannelHandler) EventStoreConfigurator {
@@ -53,14 +65,14 @@ func NewProjectionHandlersConfig(projectionHandlers map[string]ProjectionChannel
 	}
 }
 
-func (store *EventStore) Add(event events.AggregateEvent) (bool, error) {
+func (store *EventStore) Add(event events.StoreEvent) (bool, error) {
 	result, err := store.Repository.Append(event)
 	if err != nil {
 		return false, err
 	}
 
 	if store.ProjectionBroker != nil {
-		msg := broker.NewBrokerMessage(event.GetAggregateID(), event.GetEventType(), nil)
+		msg := broker.NewBrokerMessage(event.AggregateID, event.EventType, nil)
 		for _, topic := range store.ProjectionTopics {
 			store.ProjectionBroker.Publish(topic, msg)
 		}
@@ -68,23 +80,23 @@ func (store *EventStore) Add(event events.AggregateEvent) (bool, error) {
 	return result, err
 }
 
-func (store *EventStore) GetByName(aggregateName string) ([]events.AggregateEvent, error) {
+func (store *EventStore) GetByName(aggregateName string) ([]events.StoreEvent, error) {
 	result, ok, err := store.Repository.RetriveByAggregateName(aggregateName)
 	if ok {
 		return result, nil
 	}
-	return []events.AggregateEvent{}, err
+	return []events.StoreEvent{}, err
 }
 
-func (store *EventStore) GetByID(aggregateID string) ([]events.AggregateEvent, error) {
+func (store *EventStore) GetByID(aggregateID string) ([]events.StoreEvent, error) {
 	result, ok, err := store.Repository.RetriveByAggregateID(aggregateID)
 	if ok {
 		return result, nil
 	}
-	return []events.AggregateEvent{}, err
+	return []events.StoreEvent{}, err
 }
 
-func (store *EventStore) GetByEventID(ID string) (*events.AggregateEvent, bool, error) {
+func (store *EventStore) GetByEventID(ID string) (*events.StoreEvent, bool, error) {
 	result, ok, err := store.Repository.RetriveByID(ID)
 	if ok {
 		return result, ok, nil

@@ -1,7 +1,6 @@
 package broker_test
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"testing"
@@ -25,6 +24,5 @@ func messageHandler(c chan broker.BrokerMessage) {
 func TestBrokerCreation_ok(t *testing.T) {
 	topic := "test"
 	b := broker.NewBroker()
-	c := b.Subscribe(topic)
 	b.Publish(topic, broker.NewBrokerMessage("123", "test-event", nil))
 }

@@ -1,32 +1,35 @@
 package repository
 
 import (
+	"strconv"
+
 	"github.com/pix303/eventstore-go-v2/pkg/errors"
 	"github.com/pix303/eventstore-go-v2/pkg/events"
 )
 
 type InMemoryRepository struct {
-	events []events.AggregateEvent
+	events []events.StoreEvent
 }
 
-func (repo *InMemoryRepository) Append(event events.AggregateEvent) (bool, error) {
+func (repo *InMemoryRepository) Append(event events.StoreEvent) (bool, error) {
 	repo.events = append(repo.events, event)
 	return true, nil
 }
 
-func (repo *InMemoryRepository) RetriveByID(id string) (*events.AggregateEvent, bool, error) {
+func (repo *InMemoryRepository) RetriveByID(id string) (*events.StoreEvent, bool, error) {
 	for _, evt := range repo.events {
-		if evt.GetID() == id {
+		evtId := strconv.Itoa(int(evt.Id))
+		if evtId == id {
 			return &evt, true, nil
 		}
 	}
 	return nil, false, errors.NotFoundAggregateID
 }
 
-func (repo *InMemoryRepository) RetriveByAggregateID(id string) ([]events.AggregateEvent, bool, error) {
-	result := []events.AggregateEvent{}
+func (repo *InMemoryRepository) RetriveByAggregateID(id string) ([]events.StoreEvent, bool, error) {
+	result := []events.StoreEvent{}
 	for _, evt := range repo.events {
-		if evt.GetAggregateID() == id {
+		if evt.AggregateID == id {
 			result = append(result, evt)
 		}
 	}
@@ -34,13 +37,13 @@ func (repo *InMemoryRepository) RetriveByAggregateID(id string) ([]events.Aggreg
 	if len(result) > 0 {
 		return result, true, nil
 	}
-	return []events.AggregateEvent{}, false, errors.NotFoundAggregateID
+	return []events.StoreEvent{}, false, errors.NotFoundAggregateID
 }
 
-func (repo *InMemoryRepository) RetriveByAggregateName(name string) ([]events.AggregateEvent, bool, error) {
-	result := []events.AggregateEvent{}
+func (repo *InMemoryRepository) RetriveByAggregateName(name string) ([]events.StoreEvent, bool, error) {
+	result := []events.StoreEvent{}
 	for _, evt := range repo.events {
-		if evt.GetAggregateName() == name {
+		if evt.AggregateID == name {
 			result = append(result, evt)
 		}
 	}
@@ -48,5 +51,5 @@ func (repo *InMemoryRepository) RetriveByAggregateName(name string) ([]events.Ag
 	if len(result) > 0 {
 		return result, true, nil
 	}
-	return []events.AggregateEvent{}, false, errors.NotFoundAggregateID
+	return []events.StoreEvent{}, false, errors.NotFoundAggregateID
 }
