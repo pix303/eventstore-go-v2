@@ -7,21 +7,29 @@ import (
 	"github.com/pix303/eventstore-go-v2/pkg/events"
 )
 
-type EventStoreRepository interface {
-	Append(event events.StoreEvent) (bool, error)
-	RetriveByID(id string) (*events.StoreEvent, bool, error)
-	RetriveByAggregateID(id string) ([]events.StoreEvent, bool, error)
-	RetriveByAggregateName(name string) ([]events.StoreEvent, bool, error)
+type EventStoreConfigurator func(store *EventStore) error
+
+func WithInMemoryRepository(store *EventStore) error {
+	store.Repository = &repository.InMemoryRepository{}
+
+	return nil
+}
+
+func WithPostgresqlRepository(store *EventStore) error {
+	pr, err := postgres.NewPostgresqlRepository()
+	if err != nil {
+		return err
+	}
+	store.Repository = pr
+	return nil
 }
 
 type EventStore struct {
-	Repository       EventStoreRepository
+	repository.EventStoreRepositable
 	IsProjectable    bool
 	ProjectionBroker *broker.Broker
 	ProjectionTopics []string
 }
-
-type EventStoreConfigurator func(store *EventStore) error
 
 func NewEventStore(configures []EventStoreConfigurator) (EventStore, error) {
 	store := EventStore{}
@@ -32,22 +40,6 @@ func NewEventStore(configures []EventStoreConfigurator) (EventStore, error) {
 		}
 	}
 	return store, nil
-}
-
-func WithInMemoryRepository(store *EventStore) error {
-	store.Repository = &repository.InMemoryRepository{}
-	return nil
-}
-
-func NewPostgresqlRepository() EventStoreConfigurator {
-	return func(store *EventStore) error {
-		pr, err := postres.NewPostgresqlRepository()
-		if err != nil {
-			return err
-		}
-		store.Repository = pr
-		return nil
-	}
 }
 
 type ProjectionChannelHandler func(c chan broker.BrokerMessage, store *EventStore)

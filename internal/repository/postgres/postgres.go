@@ -1,14 +1,14 @@
-package postres
+package postgres
 
 import (
 	_ "embed"
-	"errors"
 	"fmt"
 	"os"
 	"strconv"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	eserrors "github.com/pix303/eventstore-go-v2/pkg/errors"
 	"github.com/pix303/eventstore-go-v2/pkg/events"
 )
 
@@ -30,7 +30,7 @@ func (this *PostgresConnctionInfoBuilder) WithHost() *PostgresConnctionInfoBuild
 	if pgHost != "" {
 		this.info.Host = pgHost
 	} else {
-		this.errs = append(this.errs, errors.New("no host"))
+		this.errs = append(this.errs, eserrors.PostgresqlConfigNoHostError)
 	}
 	pgPort := os.Getenv("PG_PORT")
 	if pgPort != "" {
@@ -40,7 +40,7 @@ func (this *PostgresConnctionInfoBuilder) WithHost() *PostgresConnctionInfoBuild
 		}
 		this.info.Port = pgPortInt
 	} else {
-		this.errs = append(this.errs, errors.New("no host port"))
+		this.errs = append(this.errs, eserrors.PostgresqlConfigNoPortError)
 	}
 	return this
 }
@@ -50,13 +50,13 @@ func (this *PostgresConnctionInfoBuilder) WithUserAndPass() *PostgresConnctionIn
 	if pgUser != "" {
 		this.info.User = pgUser
 	} else {
-		this.errs = append(this.errs, errors.New("no username"))
+		this.errs = append(this.errs, eserrors.PostgresqlConfigNoUserError)
 	}
 	pgPass := os.Getenv("PG_PASS")
 	if pgPass != "" {
 		this.info.Pass = pgPass
 	} else {
-		this.errs = append(this.errs, errors.New("no pass"))
+		this.errs = append(this.errs, eserrors.PostgresqlConfigNoPasswordError)
 	}
 	return this
 }
@@ -66,7 +66,7 @@ func (this *PostgresConnctionInfoBuilder) WithDBName() *PostgresConnctionInfoBui
 	if pgDBName != "" {
 		this.info.DBname = pgDBName
 	} else {
-		this.errs = append(this.errs, errors.New("no db name"))
+		this.errs = append(this.errs, eserrors.PostgresqlConfigNoDBNameError)
 	}
 	return this
 }
@@ -157,7 +157,7 @@ func (repo *PostgresRepository) Append(event events.StoreEvent) (bool, error) {
 	}
 
 	if numRow == 0 {
-		return false, err
+		return false, eserrors.PostgresqlNoEventAppendedError
 	}
 	return true, nil
 }

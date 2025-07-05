@@ -1,7 +1,6 @@
 package utils_test
 
 import (
-	"log"
 	"testing"
 
 	"github.com/pix303/eventstore-go-v2/pkg/events"

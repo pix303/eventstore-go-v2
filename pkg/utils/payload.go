@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/gob"
+	"log/slog"
 )
 
 func EncodePayload(item any) (string, error) {
 	var buffer bytes.Buffer
 	encoded := gob.NewEncoder(&buffer)
 	err := encoded.Encode(item)
+	slog.Debug("item on encoding", slog.Any("item", item))
 	if err != nil {
 		return "", err
 	}
