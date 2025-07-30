@@ -1,7 +1,6 @@
 package store
 
 import (
-	"errors"
 	"log/slog"
 
 	"github.com/pix303/actor-lib/pkg/actor"
@@ -10,9 +9,7 @@ import (
 	"github.com/pix303/eventstore-go-v2/pkg/events"
 )
 
-func EventStoreAddress() *actor.Address {
-	return actor.NewAddress("local", "eventstore")
-}
+var EventStoreAddress = actor.NewAddress("local", "eventstore")
 
 func NewEvenStoreActorWithInMemory() (actor.Actor, error) {
 	s, err := NewEventStoreState([]EventStoreStateConfigurator{
@@ -24,7 +21,7 @@ func NewEvenStoreActorWithInMemory() (actor.Actor, error) {
 	}
 
 	return actor.NewActor(
-		EventStoreAddress(),
+		EventStoreAddress,
 		&s,
 	)
 }
@@ -39,7 +36,7 @@ func NewEvenStoreActorWithPostgres() (actor.Actor, error) {
 	}
 
 	return actor.NewActor(
-		EventStoreAddress(),
+		EventStoreAddress,
 		&s,
 	)
 }
@@ -78,8 +75,13 @@ func NewEventStoreState(configs []EventStoreStateConfigurator) (EventStoreState,
 type AddEventBody struct {
 	Event events.StoreEvent
 }
-type ResultAddEventBody struct {
+type AddEventBodyResult struct {
 	Success bool
+	Error   error
+}
+
+type StoreEventAddedBody struct {
+	AggregateID string
 }
 
 type RetriveByAggregateNameBody struct {
@@ -99,92 +101,78 @@ type CheckExistenceByAggregateIDBodyResult struct {
 	Exists bool
 }
 
-type RetriveByEventIDBody struct {
-	Id string
-}
-type RetriveByEventIDBodyResult struct {
-	Result events.StoreEvent
-}
-
 func (this *EventStoreState) Process(inbox chan actor.Message) {
 	for {
 		msg := <-inbox
 		switch payload := msg.Body.(type) {
 		case AddEventBody:
-			slog.Info("it is an add message", slog.Any("p", payload))
-			panic("not implemented")
-
-		case RetriveByAggregateNameBody:
-			slog.Info("it is an retrive message", slog.Any("p", payload))
-			panic("not implemented")
-		}
-	}
-
-}
-
-func (this *EventStoreState) ProcessSync(msg actor.Message) (actor.Message, error) {
-	switch payload := msg.Body.(type) {
-	case AddEventBody:
-		{
 			result, err := this.Repository.Append(payload.Event)
-
 			if err != nil {
-				slog.Error("error on add event to store", slog.Any("err", err))
-				return actor.EmptyMessage(), err
+				slog.Warn("store add event error", slog.String("err", err.Error()))
 			}
-
-			return actor.NewMessage(
+			resultMsg := actor.NewMessage(
 				msg.From,
 				msg.To,
-				ResultAddEventBody{Success: result},
-			), nil
+				AddEventBodyResult{Success: result, Error: err},
+				nil,
+			)
+			if msg.WithReturn != nil {
+				msg.WithReturn <- resultMsg
+			}
+
+			addDoneMsg := actor.NewBroadcastMessage(
+				EventStoreAddress,
+				StoreEventAddedBody{AggregateID: payload.Event.AggregateID},
+			)
+			actor.BroadcastMessage(addDoneMsg)
+
+		case CheckExistenceByAggregateIDBody:
+			_, result, err := this.Repository.RetriveByAggregateID(payload.Id)
+			if err != nil {
+				slog.Warn("error on check existence aggregate events from store", slog.String("err", err.Error()))
+			}
+			resultMsg := actor.NewMessage(
+				msg.From,
+				msg.To,
+				CheckExistenceByAggregateIDBodyResult{result},
+				nil,
+			)
+			if msg.WithReturn != nil {
+				msg.WithReturn <- resultMsg
+			}
+
+		case RetriveByAggregateNameBody:
+			result, _, err := this.Repository.RetriveByAggregateName(payload.Name)
+			if err != nil {
+				slog.Warn("error on retrive by name error", slog.String("err", err.Error()))
+			}
+			resultMsg := actor.NewMessage(
+				msg.From,
+				msg.To,
+				RetriveByAggregateBodyResult{result},
+				nil,
+			)
+			if msg.WithReturn != nil {
+				msg.WithReturn <- resultMsg
+			}
+
+		case RetriveByAggregateIDBody:
+			result, _, err := this.Repository.RetriveByAggregateID(payload.Id)
+			if err != nil {
+				slog.Warn("error on retrive by ID error", slog.String("err", err.Error()))
+			}
+			resultMsg := actor.NewMessage(
+				msg.From,
+				msg.To,
+				RetriveByAggregateBodyResult{result},
+				nil,
+			)
+			if msg.WithReturn != nil {
+				msg.WithReturn <- resultMsg
+			}
+
 		}
-
-	case RetriveByAggregateIDBody:
-		result, _, err := this.Repository.RetriveByAggregateID(payload.Id)
-
-		if err != nil {
-			slog.Error("error on retrive aggregate events from store", slog.Any("err", err))
-			return actor.EmptyMessage(), err
-		}
-
-		return actor.NewMessage(
-			msg.From,
-			msg.To,
-			RetriveByAggregateBodyResult{result},
-		), err
-
-	case CheckExistenceByAggregateIDBody:
-		_, result, err := this.Repository.RetriveByAggregateID(payload.Id)
-
-		if err != nil {
-			slog.Error("error on retrive aggregate events from store", slog.Any("err", err))
-			return actor.EmptyMessage(), err
-		}
-
-		return actor.NewMessage(
-			msg.From,
-			msg.To,
-			CheckExistenceByAggregateIDBodyResult{result},
-		), err
-
-	case RetriveByAggregateNameBody:
-		result, _, err := this.Repository.RetriveByAggregateName(payload.Name)
-		if err != nil {
-			slog.Error("error on retrive aggregate events from store", slog.Any("err", err))
-			return actor.EmptyMessage(), err
-		}
-		return actor.NewMessage(
-			nil,
-			msg.To,
-			RetriveByAggregateBodyResult{result},
-		), err
-
-	default:
-		slog.Info("unknown message", slog.Any("p", payload))
-		return actor.EmptyMessage(), errors.New("message not implemented")
 	}
-
 }
 
 func (this *EventStoreState) Shutdown() {
