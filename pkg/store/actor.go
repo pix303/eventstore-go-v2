@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/pix303/actor-lib/pkg/actor"
+	"github.com/pix303/actor-lib/pkg/subscriber"
 	"github.com/pix303/eventstore-go-v2/internal/repository"
 	"github.com/pix303/eventstore-go-v2/internal/repository/postgres"
 	"github.com/pix303/eventstore-go-v2/pkg/events"
@@ -43,21 +44,24 @@ func NewEvenStoreActorWithPostgres() (actor.Actor, error) {
 
 type EventStoreState struct {
 	repository.EventStoreRepositable
+	SubscriptionState *subscriber.SubscriptionsState
 }
 
 type EventStoreStateConfigurator func(state *EventStoreState) error
 
 func WithInMemoryRepositoryForActor(state *EventStoreState) error {
 	state.Repository = &repository.InMemoryRepository{}
+	state.SubscriptionState = subscriber.NewSubscribeState()
 	return nil
 }
 
-func WithPostgresqlRepositoryForActor(store *EventStoreState) error {
+func WithPostgresqlRepositoryForActor(state *EventStoreState) error {
 	pr, err := postgres.NewPostgresqlRepository()
 	if err != nil {
 		return err
 	}
-	store.Repository = pr
+	state.Repository = pr
+	state.SubscriptionState = subscriber.NewSubscribeState()
 	return nil
 }
 
@@ -101,12 +105,17 @@ type CheckExistenceByAggregateIDBodyResult struct {
 	Exists bool
 }
 
-func (this *EventStoreState) Process(inbox chan actor.Message) {
+func (state *EventStoreState) Process(inbox <-chan actor.Message) {
 	for {
 		msg := <-inbox
 		switch payload := msg.Body.(type) {
+		case actor.AddSubscriptionMessageBody:
+			slog.Debug("add subscription", slog.String("from", msg.From.String()))
+			state.SubscriptionState.AddSubscription(msg.From)
+		case actor.RemoveSubscriptionMessageBody:
+			state.SubscriptionState.RemoveSubscription(msg.From)
 		case AddEventBody:
-			result, err := this.Repository.Append(payload.Event)
+			result, err := state.Repository.Append(payload.Event)
 			if err != nil {
 				slog.Warn("store add event error", slog.String("err", err.Error()))
 			}
@@ -120,14 +129,15 @@ func (this *EventStoreState) Process(inbox chan actor.Message) {
 				msg.WithReturn <- resultMsg
 			}
 
-			addDoneMsg := actor.NewBroadcastMessage(
+			addDoneMsg := actor.NewSubscribersMessage(
 				EventStoreAddress,
 				StoreEventAddedBody{AggregateID: payload.Event.AggregateID},
 			)
-			actor.BroadcastMessage(addDoneMsg)
+
+			state.SubscriptionState.NotifySubscribers(addDoneMsg)
 
 		case CheckExistenceByAggregateIDBody:
-			_, result, err := this.Repository.RetriveByAggregateID(payload.Id)
+			_, result, err := state.Repository.RetriveByAggregateID(payload.Id)
 			if err != nil {
 				slog.Warn("error on check existence aggregate events from store", slog.String("err", err.Error()))
 			}
@@ -142,7 +152,7 @@ func (this *EventStoreState) Process(inbox chan actor.Message) {
 			}
 
 		case RetriveByAggregateNameBody:
-			result, _, err := this.Repository.RetriveByAggregateName(payload.Name)
+			result, _, err := state.Repository.RetriveByAggregateName(payload.Name)
 			if err != nil {
 				slog.Warn("error on retrive by name error", slog.String("err", err.Error()))
 			}
@@ -157,7 +167,7 @@ func (this *EventStoreState) Process(inbox chan actor.Message) {
 			}
 
 		case RetriveByAggregateIDBody:
-			result, _, err := this.Repository.RetriveByAggregateID(payload.Id)
+			result, _, err := state.Repository.RetriveByAggregateID(payload.Id)
 			if err != nil {
 				slog.Warn("error on retrive by ID error", slog.String("err", err.Error()))
 			}
@@ -175,6 +185,8 @@ func (this *EventStoreState) Process(inbox chan actor.Message) {
 	}
 }
 
-func (this *EventStoreState) Shutdown() {
-	slog.Info("shutdown event store state")
+func (state *EventStoreState) Shutdown() {
+	state.Repository = nil
+	state.SubscriptionState = nil
+	slog.Info("eventstore state cleaned")
 }
