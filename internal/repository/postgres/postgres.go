@@ -8,8 +8,8 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	eserrors "github.com/pix303/eventstore-go-v2/pkg/errors"
 	"github.com/pix303/eventstore-go-v2/pkg/events"
+	"github.com/pix303/postgres-util-go/pkg/postgres"
 )
 
 type PostgresConnctionInfo struct {
@@ -25,57 +25,57 @@ type PostgresConnctionInfoBuilder struct {
 	errs []error
 }
 
-func (this *PostgresConnctionInfoBuilder) WithHost() *PostgresConnctionInfoBuilder {
+func (builder *PostgresConnctionInfoBuilder) WithHost() *PostgresConnctionInfoBuilder {
 	pgHost := os.Getenv("PG_HOST")
 	if pgHost != "" {
-		this.info.Host = pgHost
+		builder.info.Host = pgHost
 	} else {
-		this.errs = append(this.errs, eserrors.PostgresqlConfigNoHostError)
+		builder.errs = append(builder.errs, postgres.PostgresqlConfigNoHostError)
 	}
 	pgPort := os.Getenv("PG_PORT")
 	if pgPort != "" {
 		pgPortInt, err := strconv.Atoi(pgPort)
 		if err != nil {
-			this.errs = append(this.errs, err)
+			builder.errs = append(builder.errs, err)
 		}
-		this.info.Port = pgPortInt
+		builder.info.Port = pgPortInt
 	} else {
-		this.errs = append(this.errs, eserrors.PostgresqlConfigNoPortError)
+		builder.errs = append(builder.errs, postgres.PostgresqlConfigNoPortError)
 	}
-	return this
+	return builder
 }
 
-func (this *PostgresConnctionInfoBuilder) WithUserAndPass() *PostgresConnctionInfoBuilder {
+func (builder *PostgresConnctionInfoBuilder) WithUserAndPass() *PostgresConnctionInfoBuilder {
 	pgUser := os.Getenv("PG_USER")
 	if pgUser != "" {
-		this.info.User = pgUser
+		builder.info.User = pgUser
 	} else {
-		this.errs = append(this.errs, eserrors.PostgresqlConfigNoUserError)
+		builder.errs = append(builder.errs, postgres.PostgresqlConfigNoUserError)
 	}
 	pgPass := os.Getenv("PG_PASS")
 	if pgPass != "" {
-		this.info.Pass = pgPass
+		builder.info.Pass = pgPass
 	} else {
-		this.errs = append(this.errs, eserrors.PostgresqlConfigNoPasswordError)
+		builder.errs = append(builder.errs, postgres.PostgresqlConfigNoPasswordError)
 	}
-	return this
+	return builder
 }
 
-func (this *PostgresConnctionInfoBuilder) WithDBName() *PostgresConnctionInfoBuilder {
+func (builder *PostgresConnctionInfoBuilder) WithDBName() *PostgresConnctionInfoBuilder {
 	pgDBName := os.Getenv("PG_DBNAME")
 	if pgDBName != "" {
-		this.info.DBname = pgDBName
+		builder.info.DBname = pgDBName
 	} else {
-		this.errs = append(this.errs, eserrors.PostgresqlConfigNoDBNameError)
+		builder.errs = append(builder.errs, postgres.PostgresqlConfigNoDBNameError)
 	}
-	return this
+	return builder
 }
 
-func (this *PostgresConnctionInfoBuilder) Build() (PostgresConnctionInfo, error) {
-	if len(this.errs) > 0 {
-		return PostgresConnctionInfo{}, this.errs[0]
+func (builder *PostgresConnctionInfoBuilder) Build() (PostgresConnctionInfo, error) {
+	if len(builder.errs) > 0 {
+		return PostgresConnctionInfo{}, builder.errs[0]
 	}
-	return this.info, nil
+	return builder.info, nil
 }
 
 func NewPostgresqlRepository() (*PostgresRepository, error) {
@@ -157,7 +157,7 @@ func (repo *PostgresRepository) Append(event events.StoreEvent) (bool, error) {
 	}
 
 	if numRow == 0 {
-		return false, eserrors.PostgresqlNoEventAppendedError
+		return false, postgres.PostgresqlNoEventAppendedError
 	}
 	return true, nil
 }
