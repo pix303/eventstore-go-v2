@@ -23,7 +23,7 @@ func (repo *InMemoryRepository) RetriveByID(id string) (*events.StoreEvent, bool
 			return &evt, true, nil
 		}
 	}
-	return nil, false, errors.NotFoundAggregateID
+	return nil, false, errors.ErrNotFoundAggregateID
 }
 
 func (repo *InMemoryRepository) RetriveByAggregateID(id string) ([]events.StoreEvent, bool, error) {
@@ -37,7 +37,7 @@ func (repo *InMemoryRepository) RetriveByAggregateID(id string) ([]events.StoreE
 	if len(result) > 0 {
 		return result, true, nil
 	}
-	return []events.StoreEvent{}, false, errors.NotFoundAggregateID
+	return []events.StoreEvent{}, false, errors.ErrNotFoundAggregateID
 }
 
 func (repo *InMemoryRepository) RetriveByAggregateName(name string) ([]events.StoreEvent, bool, error) {
@@ -51,5 +51,5 @@ func (repo *InMemoryRepository) RetriveByAggregateName(name string) ([]events.St
 	if len(result) > 0 {
 		return result, true, nil
 	}
-	return []events.StoreEvent{}, false, errors.NotFoundAggregateID
+	return []events.StoreEvent{}, false, errors.ErrNotFoundAggregateID
 }
