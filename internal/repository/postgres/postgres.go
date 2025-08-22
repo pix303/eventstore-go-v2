@@ -2,117 +2,12 @@ package postgres
 
 import (
 	_ "embed"
-	"fmt"
-	"os"
-	"strconv"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"github.com/pix303/eventstore-go-v2/pkg/events"
 	"github.com/pix303/postgres-util-go/pkg/postgres"
 )
-
-type PostgresConnctionInfo struct {
-	Host   string
-	Port   int
-	User   string
-	Pass   string
-	DBname string
-}
-
-type PostgresConnctionInfoBuilder struct {
-	info PostgresConnctionInfo
-	errs []error
-}
-
-func (builder *PostgresConnctionInfoBuilder) WithHost() *PostgresConnctionInfoBuilder {
-	pgHost := os.Getenv("PG_HOST")
-	if pgHost != "" {
-		builder.info.Host = pgHost
-	} else {
-		builder.errs = append(builder.errs, postgres.PostgresqlConfigNoHostError)
-	}
-	pgPort := os.Getenv("PG_PORT")
-	if pgPort != "" {
-		pgPortInt, err := strconv.Atoi(pgPort)
-		if err != nil {
-			builder.errs = append(builder.errs, err)
-		}
-		builder.info.Port = pgPortInt
-	} else {
-		builder.errs = append(builder.errs, postgres.PostgresqlConfigNoPortError)
-	}
-	return builder
-}
-
-func (builder *PostgresConnctionInfoBuilder) WithUserAndPass() *PostgresConnctionInfoBuilder {
-	pgUser := os.Getenv("PG_USER")
-	if pgUser != "" {
-		builder.info.User = pgUser
-	} else {
-		builder.errs = append(builder.errs, postgres.PostgresqlConfigNoUserError)
-	}
-	pgPass := os.Getenv("PG_PASS")
-	if pgPass != "" {
-		builder.info.Pass = pgPass
-	} else {
-		builder.errs = append(builder.errs, postgres.PostgresqlConfigNoPasswordError)
-	}
-	return builder
-}
-
-func (builder *PostgresConnctionInfoBuilder) WithDBName() *PostgresConnctionInfoBuilder {
-	pgDBName := os.Getenv("PG_DBNAME")
-	if pgDBName != "" {
-		builder.info.DBname = pgDBName
-	} else {
-		builder.errs = append(builder.errs, postgres.PostgresqlConfigNoDBNameError)
-	}
-	return builder
-}
-
-func (builder *PostgresConnctionInfoBuilder) Build() (PostgresConnctionInfo, error) {
-	if len(builder.errs) > 0 {
-		return PostgresConnctionInfo{}, builder.errs[0]
-	}
-	return builder.info, nil
-}
-
-func NewPostgresqlRepository() (*PostgresRepository, error) {
-	pcib := PostgresConnctionInfoBuilder{}
-
-	connectionInfo, err := pcib.WithHost().WithUserAndPass().WithDBName().Build()
-	if err != nil {
-		return nil, err
-	}
-	connStr := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable",
-		connectionInfo.Host,
-		connectionInfo.Port,
-		connectionInfo.User,
-		connectionInfo.Pass,
-		connectionInfo.DBname,
-	)
-
-	db, err := sqlx.Connect("postgres", connStr)
-	if err != nil {
-		return nil, err
-	}
-
-	err = db.Ping()
-	if err != nil {
-		return nil, err
-	}
-
-	pr := PostgresRepository{
-		DB: db,
-	}
-
-	return &pr, nil
-}
-
-type PostgresRepository struct {
-	DB *sqlx.DB
-}
 
 var insertStmt string = `
 INSERT INTO store.events(
@@ -134,6 +29,19 @@ VALUES(
 	:payloadDataType
 );
 	`
+
+type PostgresRepository struct {
+	DB *sqlx.DB
+}
+
+func NewPostgresqlRepository() (*PostgresRepository, error) {
+	db, err := postgres.NewPostgresqlRepository()
+	if err != nil {
+		return nil, err
+	}
+
+	return &PostgresRepository{DB: db}, nil
+}
 
 func (repo *PostgresRepository) Append(event events.StoreEvent) (bool, error) {
 	payloadDataType, payloadData := event.GetPayload()
@@ -157,8 +65,9 @@ func (repo *PostgresRepository) Append(event events.StoreEvent) (bool, error) {
 	}
 
 	if numRow == 0 {
-		return false, postgres.PostgresqlNoEventAppendedError
+		return false, postgres.ErrPostgresqlNoEventAppended
 	}
+
 	return true, nil
 }
 
