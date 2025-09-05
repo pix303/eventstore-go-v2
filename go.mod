@@ -6,7 +6,8 @@ require (
 	github.com/beevik/guid v1.0.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/lib/pq v1.10.9
-	github.com/pix303/postgres-util-go v0.0.0-20250812193936-8ebce107751e
+	github.com/pix303/postgres-util-go v0.0.1
+	github.com/pix303/cinecity v0.0.1
 	github.com/stretchr/testify v1.10.0
 )
 
