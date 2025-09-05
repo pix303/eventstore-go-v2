@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pix303/actor-lib/pkg/actor"
+	"github.com/pix303/cinecity/pkg/actor"
 	"github.com/pix303/eventstore-go-v2/pkg/events"
 	"github.com/pix303/eventstore-go-v2/pkg/store"
 	"github.com/stretchr/testify/assert"

@@ -42,32 +42,10 @@ func NewEventStore(configures []EventStoreConfigurator) (EventStore, error) {
 	return store, nil
 }
 
-type ProjectionChannelHandler func(c chan broker.BrokerMessage, store *EventStore)
-
-func NewProjectionHandlersConfig(projectionHandlers map[string]ProjectionChannelHandler) EventStoreConfigurator {
-	return func(store *EventStore) error {
-		store.ProjectionBroker = broker.NewBroker()
-		for key, handler := range projectionHandlers {
-			c := make(chan broker.BrokerMessage)
-			store.ProjectionBroker.SubscribeWithChan(key, c)
-			store.ProjectionTopics = append(store.ProjectionTopics, key)
-			go handler(c, store)
-		}
-		return nil
-	}
-}
-
 func (store *EventStore) Add(event events.StoreEvent) (bool, error) {
 	result, err := store.Repository.Append(event)
 	if err != nil {
 		return false, err
-	}
-
-	if store.ProjectionBroker != nil {
-		msg := broker.NewBrokerMessage(event.AggregateID, event.EventType, nil)
-		for _, topic := range store.ProjectionTopics {
-			store.ProjectionBroker.Publish(topic, msg)
-		}
 	}
 	return result, err
 }

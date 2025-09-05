@@ -3,8 +3,8 @@ package store
 import (
 	"log/slog"
 
-	"github.com/pix303/actor-lib/pkg/actor"
-	"github.com/pix303/actor-lib/pkg/subscriber"
+	"github.com/pix303/cinecity/pkg/actor"
+	"github.com/pix303/cinecity/pkg/subscriber"
 	"github.com/pix303/eventstore-go-v2/internal/repository"
 	"github.com/pix303/eventstore-go-v2/internal/repository/postgres"
 	"github.com/pix303/eventstore-go-v2/pkg/events"
