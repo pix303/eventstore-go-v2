@@ -23,7 +23,7 @@ func NewEvenStoreActorWithInMemory() (actor.Actor, error) {
 
 	return actor.NewActor(
 		EventStoreAddress,
-		&s,
+		s,
 	)
 }
 
@@ -38,7 +38,7 @@ func NewEvenStoreActorWithPostgres() (actor.Actor, error) {
 
 	return actor.NewActor(
 		EventStoreAddress,
-		&s,
+		s,
 	)
 }
 
@@ -65,15 +65,15 @@ func WithPostgresqlRepositoryForActor(state *EventStoreState) error {
 	return nil
 }
 
-func NewEventStoreState(configs []EventStoreStateConfigurator) (EventStoreState, error) {
+func NewEventStoreState(configs []EventStoreStateConfigurator) (*EventStoreState, error) {
 	s := EventStoreState{}
 	for _, c := range configs {
 		err := c(&s)
 		if err != nil {
-			return s, err
+			return &s, err
 		}
 	}
-	return s, nil
+	return &s, nil
 }
 
 type AddEventBody struct {
@@ -133,7 +133,6 @@ func (state *EventStoreState) Process(inbox <-chan actor.Message) {
 				EventStoreAddress,
 				StoreEventAddedBody{AggregateID: payload.Event.AggregateID},
 			)
-
 			state.SubscriptionState.NotifySubscribers(addDoneMsg)
 
 		case CheckExistenceByAggregateIDBody:

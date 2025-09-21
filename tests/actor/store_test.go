@@ -30,7 +30,7 @@ func TestEventStoreActor(t *testing.T) {
 
 	returnBox := make(chan actor.Message)
 	addMsg := actor.NewMessage(
-		store.EventStoreAddress(),
+		store.EventStoreAddress,
 		testAddress,
 		store.AddEventBody{Event: addStoreEvent},
 		returnBox,
@@ -54,7 +54,7 @@ func TestEventStoreActor(t *testing.T) {
 
 	checkMsgBody := store.CheckExistenceByAggregateIDBody{Id: addStoreEvent.AggregateID}
 	checkMsg := actor.NewMessage(
-		store.EventStoreAddress(),
+		store.EventStoreAddress,
 		testAddress,
 		checkMsgBody,
 		returnBox,

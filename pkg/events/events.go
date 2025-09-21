@@ -33,7 +33,7 @@ func NewStoreEvent[T any](eventType, aggregateName, userID string, payload T, ag
 		finalAggregateID = *aggregateID
 	}
 
-	now := time.Now()
+	now := time.Now().UTC()
 
 	se := StoreEvent{
 		EventType:       eventType,
