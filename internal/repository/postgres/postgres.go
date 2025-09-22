@@ -98,7 +98,7 @@ func (repo *PostgresRepository) RetriveByAggregateID(id string) ([]events.StoreE
 		return nil, false, err
 	}
 
-	return result, true, nil
+	return result, len(result) > 0, nil
 }
 
 var selectByAggregateNameStmt string = `
