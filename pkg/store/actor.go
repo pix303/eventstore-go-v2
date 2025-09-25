@@ -105,83 +105,87 @@ type CheckExistenceByAggregateIDBodyResult struct {
 	Exists bool
 }
 
-func (state *EventStoreState) Process(inbox <-chan actor.Message) {
-	for {
-		msg := <-inbox
-		switch payload := msg.Body.(type) {
-		case actor.AddSubscriptionMessageBody:
-			slog.Debug("add subscription", slog.String("from", msg.From.String()))
-			state.SubscriptionState.AddSubscription(msg.From)
-		case actor.RemoveSubscriptionMessageBody:
-			state.SubscriptionState.RemoveSubscription(msg.From)
-		case AddEventBody:
-			result, err := state.Repository.Append(payload.Event)
-			if err != nil {
-				slog.Warn("store add event error", slog.String("err", err.Error()))
-			}
-			resultMsg := actor.NewMessage(
-				msg.From,
-				msg.To,
-				AddEventBodyResult{Success: result, Error: err},
-				nil,
-			)
-			if msg.WithReturn != nil {
-				msg.WithReturn <- resultMsg
-			}
+func (state *EventStoreState) Process(msg actor.Message) {
+	switch payload := msg.Body.(type) {
+	case actor.AddSubscriptionMessageBody:
+		slog.Debug("add subscription", slog.String("from", msg.From.String()))
+		state.SubscriptionState.AddSubscription(msg.From)
 
-			addDoneMsg := actor.NewSubscribersMessage(
-				EventStoreAddress,
-				StoreEventAddedBody{AggregateID: payload.Event.AggregateID},
-			)
-			state.SubscriptionState.NotifySubscribers(addDoneMsg)
+	case actor.RemoveSubscriptionMessageBody:
+		slog.Debug("remove subscription", slog.String("from", msg.From.String()))
+		state.SubscriptionState.RemoveSubscription(msg.From)
 
-		case CheckExistenceByAggregateIDBody:
-			_, result, err := state.Repository.RetriveByAggregateID(payload.Id)
-			if err != nil {
-				slog.Warn("error on check existence aggregate events from store", slog.String("err", err.Error()))
-			}
-			resultMsg := actor.NewMessage(
-				msg.From,
-				msg.To,
-				CheckExistenceByAggregateIDBodyResult{result},
-				nil,
-			)
-			if msg.WithReturn != nil {
-				msg.WithReturn <- resultMsg
-			}
+	case AddEventBody:
+		result, err := state.Repository.Append(payload.Event)
+		if err != nil {
+			slog.Warn("store add event error", slog.String("err", err.Error()))
+		}
+		resultMsg := actor.NewMessage(
+			msg.From,
+			msg.To,
+			AddEventBodyResult{Success: result, Error: err},
+			false,
+		)
 
-		case RetriveByAggregateNameBody:
-			result, _, err := state.Repository.RetriveByAggregateName(payload.Name)
-			if err != nil {
-				slog.Warn("error on retrive by name error", slog.String("err", err.Error()))
-			}
-			resultMsg := actor.NewMessage(
-				msg.From,
-				msg.To,
-				RetriveByAggregateBodyResult{result},
-				nil,
-			)
-			if msg.WithReturn != nil {
-				msg.WithReturn <- resultMsg
-			}
+		if msg.WithReturn {
+			msg.ReturnChan <- actor.NewWrappedMessage(&resultMsg, nil)
+		}
 
-		case RetriveByAggregateIDBody:
-			result, _, err := state.Repository.RetriveByAggregateID(payload.Id)
-			if err != nil {
-				slog.Warn("error on retrive by ID error", slog.String("err", err.Error()))
-			}
-			resultMsg := actor.NewMessage(
-				msg.From,
-				msg.To,
-				RetriveByAggregateBodyResult{result},
-				nil,
-			)
-			if msg.WithReturn != nil {
-				msg.WithReturn <- resultMsg
-			}
+		addDoneMsg := actor.NewSubscribersMessage(
+			EventStoreAddress,
+			StoreEventAddedBody{AggregateID: payload.Event.AggregateID},
+		)
+		state.SubscriptionState.NotifySubscribers(addDoneMsg)
 
+	case CheckExistenceByAggregateIDBody:
+		_, result, err := state.Repository.RetriveByAggregateID(payload.Id)
+		if err != nil {
+			slog.Warn("error on check existence aggregate events from store", slog.String("err", err.Error()))
+		}
+		resultMsg := actor.NewMessage(
+			msg.From,
+			msg.To,
+			CheckExistenceByAggregateIDBodyResult{result},
+			false,
+		)
+		if msg.WithReturn {
+			msg.ReturnChan <- actor.NewWrappedMessage(&resultMsg, err)
+		}
+
+	case RetriveByAggregateNameBody:
+		result, _, err := state.Repository.RetriveByAggregateName(payload.Name)
+		if err != nil {
+			slog.Warn("error on retrive by name error", slog.String("err", err.Error()))
+		}
+		resultMsg := actor.NewMessage(
+			msg.From,
+			msg.To,
+			RetriveByAggregateBodyResult{result},
+			false,
+		)
+		if msg.WithReturn {
+			msg.ReturnChan <- actor.NewWrappedMessage(&resultMsg, err)
+		}
+
+	case RetriveByAggregateIDBody:
+		result, _, err := state.Repository.RetriveByAggregateID(payload.Id)
+		if err != nil {
+			slog.Warn("error on retrive by ID error", slog.String("err", err.Error()))
+		}
+		resultMsg := actor.NewMessage(
+			msg.From,
+			msg.To,
+			RetriveByAggregateBodyResult{result},
+			false,
+		)
+		if msg.WithReturn {
+			msg.ReturnChan <- actor.NewWrappedMessage(&resultMsg, err)
 		}
 	}
+}
+
+func (state *EventStoreState) GetState() any {
+	return nil
 }
 
 func (state *EventStoreState) Shutdown() {
