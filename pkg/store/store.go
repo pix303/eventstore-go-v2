@@ -3,7 +3,6 @@ package store
 import (
 	"github.com/pix303/eventstore-go-v2/internal/repository"
 	"github.com/pix303/eventstore-go-v2/internal/repository/postgres"
-	"github.com/pix303/eventstore-go-v2/pkg/broker"
 	"github.com/pix303/eventstore-go-v2/pkg/events"
 )
 
@@ -27,7 +26,6 @@ func WithPostgresqlRepository(store *EventStore) error {
 type EventStore struct {
 	repository.EventStoreRepositable
 	IsProjectable    bool
-	ProjectionBroker *broker.Broker
 	ProjectionTopics []string
 }
 
