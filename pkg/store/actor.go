@@ -81,7 +81,6 @@ type AddEventBody struct {
 }
 type AddEventBodyResult struct {
 	Success bool
-	Error   error
 }
 
 type StoreEventAddedBody struct {
@@ -120,15 +119,10 @@ func (state *EventStoreState) Process(msg actor.Message) {
 		if err != nil {
 			slog.Warn("store add event error", slog.String("err", err.Error()))
 		}
-		resultMsg := actor.NewMessage(
-			msg.From,
-			msg.To,
-			AddEventBodyResult{Success: result, Error: err},
-			false,
-		)
 
 		if msg.WithReturn {
-			msg.ReturnChan <- actor.NewWrappedMessage(&resultMsg, nil)
+			resultMsg := actor.NewReturnMessage(AddEventBodyResult{Success: result}, msg)
+			msg.ReturnChan <- actor.NewWrappedMessage(&resultMsg, err)
 		}
 
 		addDoneMsg := actor.NewSubscribersMessage(
@@ -142,14 +136,9 @@ func (state *EventStoreState) Process(msg actor.Message) {
 		if err != nil {
 			slog.Warn("error on check existence aggregate events from store", slog.String("err", err.Error()))
 		}
-		resultMsg := actor.NewMessage(
-			msg.From,
-			msg.To,
-			CheckExistenceByAggregateIDBodyResult{result},
-			false,
-		)
 		if msg.WithReturn {
-			msg.ReturnChan <- actor.NewWrappedMessage(&resultMsg, err)
+			returnMsg := actor.NewReturnMessage(CheckExistenceByAggregateIDBodyResult{result}, msg)
+			msg.ReturnChan <- actor.NewWrappedMessage(&returnMsg, err)
 		}
 
 	case RetriveByAggregateNameBody:
@@ -157,14 +146,9 @@ func (state *EventStoreState) Process(msg actor.Message) {
 		if err != nil {
 			slog.Warn("error on retrive by name error", slog.String("err", err.Error()))
 		}
-		resultMsg := actor.NewMessage(
-			msg.From,
-			msg.To,
-			RetriveByAggregateBodyResult{result},
-			false,
-		)
 		if msg.WithReturn {
-			msg.ReturnChan <- actor.NewWrappedMessage(&resultMsg, err)
+			returnMsg := actor.NewReturnMessage(RetriveByAggregateBodyResult{result}, msg)
+			msg.ReturnChan <- actor.NewWrappedMessage(&returnMsg, err)
 		}
 
 	case RetriveByAggregateIDBody:
@@ -172,14 +156,10 @@ func (state *EventStoreState) Process(msg actor.Message) {
 		if err != nil {
 			slog.Warn("error on retrive by ID error", slog.String("err", err.Error()))
 		}
-		resultMsg := actor.NewMessage(
-			msg.From,
-			msg.To,
-			RetriveByAggregateBodyResult{result},
-			false,
-		)
+
 		if msg.WithReturn {
-			msg.ReturnChan <- actor.NewWrappedMessage(&resultMsg, err)
+			returnMsg := actor.NewReturnMessage(RetriveByAggregateBodyResult{result}, msg)
+			msg.ReturnChan <- actor.NewWrappedMessage(&returnMsg, err)
 		}
 	}
 }
